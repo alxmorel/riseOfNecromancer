@@ -150,7 +150,7 @@ animations = [{
 }],
 "loop": true,
 "name": &"walk_east",
-"speed": 5.0
+"speed": 6.0
 }, {
 "frames": [{
 "duration": 1.0,
@@ -173,7 +173,7 @@ animations = [{
 }],
 "loop": true,
 "name": &"walk_north",
-"speed": 5.0
+"speed": 6.0
 }, {
 "frames": [{
 "duration": 1.0,
@@ -196,7 +196,7 @@ animations = [{
 }],
 "loop": true,
 "name": &"walk_north_east",
-"speed": 5.0
+"speed": 6.0
 }, {
 "frames": [{
 "duration": 1.0,
@@ -219,7 +219,7 @@ animations = [{
 }],
 "loop": true,
 "name": &"walk_north_west",
-"speed": 5.0
+"speed": 6.0
 }, {
 "frames": [{
 "duration": 1.0,
@@ -242,7 +242,7 @@ animations = [{
 }],
 "loop": true,
 "name": &"walk_south",
-"speed": 5.0
+"speed": 6.0
 }, {
 "frames": [{
 "duration": 1.0,
@@ -265,7 +265,7 @@ animations = [{
 }],
 "loop": true,
 "name": &"walk_south_east",
-"speed": 5.0
+"speed": 6.0
 }, {
 "frames": [{
 "duration": 1.0,
@@ -288,7 +288,7 @@ animations = [{
 }],
 "loop": true,
 "name": &"walk_south_west",
-"speed": 5.0
+"speed": 6.0
 }, {
 "frames": [{
 "duration": 1.0,
@@ -311,19 +311,33 @@ animations = [{
 }],
 "loop": true,
 "name": &"walk_west",
-"speed": 5.0
+"speed": 6.0
 }]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_qhqgy"]
-radius = 5.0
-height = 34.0
+radius = 3.0
+height = 20.0
 
 [node name="Player" type="CharacterBody2D"]
+y_sort_enabled = true
+texture_filter = 1
 script = ExtResource("1_8svfe")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+y_sort_enabled = true
+texture_filter = 1
+position = Vector2(0, -1)
 sprite_frames = SubResource("SpriteFrames_g2els")
-animation = &"idle_north_west"
+animation = &"walk_west"
+frame = 5
+frame_progress = 0.3593322
+offset = Vector2(0, -20)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+z_index = 1
+position = Vector2(1, -17)
 shape = SubResource("CapsuleShape2D_qhqgy")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(0, -21)
+zoom = Vector2(2.77, 2.77)
