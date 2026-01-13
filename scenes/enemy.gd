@@ -7,7 +7,7 @@ var current_health: int = max_health
 @export var speed: float = 150.0
 
 # Distance d'attaque (portée de mêlée)
-@export var attack_range: float = 30.0
+@export var attack_range: float = 15.0
 
 # Dégâts infligés
 @export var damage: int = 10
@@ -16,49 +16,28 @@ var current_health: int = max_health
 @export var attack_cooldown: float = 1.5
 var last_attack_time: float = 0.0
 
-# Durée de l'animation d'attaque (en secondes)
 @export var attack_duration: float = 0.6
-var attack_timer: float = 0.0
-var is_attacking: bool = false
 
 # Portée de détection (distance à laquelle l'ennemi détecte les cibles)
 @export var detection_range: float = 300.0
 
-# Référence au AnimatedSprite2D
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
+@onready var health_bar_rect: ColorRect = $HealthBar/HealthBarRect
 
-# Cible actuelle (skeleton ou joueur)
+var attack_timer: float = 0.0
+var is_attacking: bool = false
 var target: CharacterBody2D = null
-
-# Direction actuelle (4 directions: north, south, east, west)
 var current_direction: String = "south"
-
-# État actuel
 var current_state: String = "idle"  # "idle", "walk", "attack"
-
-# Timer pour recalculer la cible périodiquement
 var target_update_timer: float = 0.0
 var target_update_interval: float = 0.5  # Mettre à jour la cible toutes les 0.5 secondes
 
-func take_damage(amount: int):
-	"""Inflige des dégâts à l'ennemi"""
-	current_health -= amount
-	print("Ennemi prend ", amount, " dégâts. Santé: ", current_health, "/", max_health)
-	
-	if current_health <= 0:
-		die()
-
-func die():
-	"""Détruit l'ennemi"""
-	print("Ennemi détruit!")
-	queue_free()
-	
-	
 func _ready():
 	add_to_group("enemies")
-	# Définir l'animation idle par défaut
 	if animated_sprite:
 		animated_sprite.play("idle_south")
+		
+	update_health_bar()
 
 func _physics_process(delta):
 	# Gérer le timer d'attaque
@@ -80,6 +59,7 @@ func _physics_process(delta):
 			current_state = "idle"
 		velocity = Vector2.ZERO
 		play_animation()
+		move_and_slide()  # Un seul appel ici
 		return
 	
 	# Vérifier si la cible est toujours valide (pas détruite)
@@ -91,7 +71,7 @@ func _physics_process(delta):
 	if is_attacking:
 		velocity = Vector2.ZERO
 		play_animation()
-		move_and_slide()
+		move_and_slide()  # Un seul appel ici
 		return
 	
 	# Calculer la distance à la cible
@@ -101,16 +81,15 @@ func _physics_process(delta):
 	if distance_to_target <= attack_range:
 		# Attaquer la cible
 		try_attack()
+		velocity = Vector2.ZERO
 	else:
-		# Se déplacer vers la cible
+		# Se déplacer vers la cible (move_towards_target() appelle déjà move_and_slide())
 		move_towards_target(delta)
-	
-	# Appliquer le mouvement
-	move_and_slide()
 	
 	# Jouer l'animation appropriée
 	play_animation()
-
+	
+	
 func find_target():
 	"""
 	Trouve une cible selon la priorité :
@@ -156,18 +135,48 @@ func find_target():
 	target = null
 
 func move_towards_target(delta):
-	"""Se déplace vers la cible"""
+	"""Se déplace vers la cible avec contournement des obstacles"""
 	if target == null or not is_instance_valid(target):
+		velocity = Vector2.ZERO
 		return
 	
 	# Calculer la direction vers la cible
 	var direction = (target.global_position - global_position).normalized()
 	
-	# Appliquer la vitesse
+	# Appliquer la vitesse normale
 	velocity = direction * speed
 	
+	# Appliquer le mouvement UNE SEULE FOIS
+	move_and_slide()
+	
+	# Vérifier si on est bloqué APRÈS le mouvement
+	if get_slide_collision_count() > 0:
+		var collision = get_slide_collision(0)
+		if collision:
+			var normal = collision.get_normal()
+			
+			# Calculer une direction de contournement pour le prochain frame
+			var slide_direction = direction.slide(normal).normalized()
+			
+			# Si la direction de glissement est valide, l'utiliser pour le prochain mouvement
+			if slide_direction.length() > 0.1:
+				velocity = slide_direction * speed
+			else:
+				# Si le glissement ne fonctionne pas, essayer de contourner par la gauche ou droite
+				var perp_vector = Vector2(-normal.y, normal.x)  # Vecteur perpendiculaire
+				
+				# Choisir la direction qui rapproche le plus de la cible
+				var left_direction = (direction + perp_vector).normalized()
+				var right_direction = (direction - perp_vector).normalized()
+				
+				var left_distance = (global_position + left_direction * 20.0).distance_to(target.global_position)
+				var right_distance = (global_position + right_direction * 20.0).distance_to(target.global_position)
+				
+				var best_direction = left_direction if left_distance < right_distance else right_direction
+				velocity = best_direction * speed
+	
 	# Mettre à jour la direction pour l'animation
-	update_direction(direction)
+	update_direction(velocity.normalized() if velocity.length() > 0.1 else direction)
 	
 	# Mettre à jour l'état
 	current_state = "walk"
@@ -211,6 +220,27 @@ func attack_target():
 	
 	print("Ennemi attaque ", target.name, " pour ", damage, " dégâts")
 
+func take_damage(amount: int):
+	"""Inflige des dégâts à l'ennemi"""
+	current_health -= amount
+	print("Ennemi prend ", amount, " dégâts. Santé: ", current_health, "/", max_health)
+	
+	update_health_bar()
+	
+	if current_health <= 0:
+		die()
+
+func update_health_bar():
+	"""Met à jour l'affichage de la barre de vie"""
+	if health_bar_rect:
+		var health_percentage = float(current_health) / float(max_health)
+		health_bar_rect.size.x = health_bar_rect.get_parent().size.x * health_percentage
+		
+func die():
+	"""Détruit l'ennemi"""
+	print("Ennemi détruit!")
+	queue_free()
+	
 func update_direction(direction_vector: Vector2):
 	"""
 	Convertit un vecteur de direction en direction cardinale (4 directions)

@@ -1370,5 +1370,17 @@ position = Vector2(281, 400)
 position = Vector2(316, 389)
 
 [node name="Enemy" parent="." instance=ExtResource("14_2nvis")]
-position = Vector2(463.00003, 378)
+position = Vector2(460, 387)
+scale = Vector2(0.3, 0.3)
+
+[node name="Enemy2" parent="." instance=ExtResource("14_2nvis")]
+position = Vector2(528, 394)
+scale = Vector2(0.3, 0.3)
+
+[node name="Enemy3" parent="." instance=ExtResource("14_2nvis")]
+position = Vector2(495, 350)
+scale = Vector2(0.3, 0.3)
+
+[node name="Enemy4" parent="." instance=ExtResource("14_2nvis")]
+position = Vector2(459, 343)
 scale = Vector2(0.3, 0.3)
