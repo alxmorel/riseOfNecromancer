@@ -1,8 +1,17 @@
-[gd_scene load_steps=60 format=3 uid="uid://caroa123hbr5m"]
+[gd_scene load_steps=67 format=3 uid="uid://caroa123hbr5m"]
 
 [ext_resource type="Texture2D" uid="uid://2xg13tmupppo" path="res://assets/characters/school_director/rotations/south.png" id="1_3vyb7"]
 [ext_resource type="Script" uid="uid://dawg1rygg6fbf" path="res://scenes/player.gd" id="1_8svfe"]
 [ext_resource type="Texture2D" uid="uid://cudxmaeipsffj" path="res://assets/characters/school_director/rotations/east.png" id="1_74r1k"]
+[ext_resource type="Script" uid="uid://c2ud75cith27u" path="res://components/animation_component.gd" id="1_animation"]
+[ext_resource type="Script" uid="uid://yqq1rdk67dfj" path="res://components/health_component.gd" id="1_health"]
+[ext_resource type="Script" uid="uid://hxyekrf2vjr5" path="res://components/skeleton_merge_manager.gd" id="1_merge_manager"]
+[ext_resource type="Script" uid="uid://d1a6wxiji1wmc" path="res://components/movement_component.gd" id="1_movement"]
+[ext_resource type="Script" uid="uid://bjm1gqysy71gv" path="res://components/necro_energy_component.gd" id="1_necro"]
+[ext_resource type="PackedScene" uid="uid://cv1skec8bde23" path="res://scenes/skeleton.tscn" id="1_skeleton"]
+[ext_resource type="Script" uid="uid://fm2o2pdxrwuh" path="res://components/summoner_component.gd" id="1_summoner"]
+[ext_resource type="Script" path="res://components/inventory_component.gd" id="1_inventory"]
+[ext_resource type="PackedScene" uid="uid://cryv6bttrklb3" path="res://scenes/inventory_ui.tscn" id="1_inventory_ui"]
 [ext_resource type="Texture2D" uid="uid://c1dxgbp7hxkxm" path="res://assets/characters/school_director/rotations/north.png" id="2_8svfe"]
 [ext_resource type="Texture2D" uid="uid://ba1gf5xdmj0wl" path="res://assets/characters/school_director/rotations/north-east.png" id="3_2a3c5"]
 [ext_resource type="Texture2D" uid="uid://b3pbp1851tetw" path="res://assets/characters/school_director/rotations/north-west.png" id="4_42b1b"]
@@ -399,3 +408,33 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.21568628, 0, 0.41568628, 1)
+
+[node name="HealthComponent" type="Node" parent="."]
+script = ExtResource("1_health")
+
+[node name="NecroEnergyComponent" type="Node" parent="."]
+script = ExtResource("1_necro")
+max_energy = 100.0
+drain_rate = -5.0
+
+[node name="MovementComponent" type="Node" parent="."]
+script = ExtResource("1_movement")
+
+[node name="AnimationComponent" type="Node" parent="."]
+script = ExtResource("1_animation")
+use_8_directions = true
+
+[node name="SummonerComponent" type="Node" parent="."]
+script = ExtResource("1_summoner")
+summon_scene = ExtResource("1_skeleton")
+summoned_group = "skeletons"
+
+[node name="SkeletonMergeManager" type="Node" parent="."]
+script = ExtResource("1_merge_manager")
+skeleton_scene = ExtResource("1_skeleton")
+
+[node name="InventoryComponent" type="Node" parent="."]
+script = ExtResource("1_inventory")
+max_slots = 50
+
+[node name="InventoryUI" parent="." instance=ExtResource("1_inventory_ui")]

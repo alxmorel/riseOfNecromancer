@@ -1,449 +1,392 @@
 extends CharacterBody2D
 
-@export var max_health: int = 100
+## Player - Joueur contrôlé par l'utilisateur
+## Architecture modulaire basée sur des composants
+
+# Composants (optionnels pour migration progressive)
+@onready var health: HealthComponent = $HealthComponent if has_node("HealthComponent") else null
+@onready var necro_energy: NecroEnergyComponent = $NecroEnergyComponent if has_node("NecroEnergyComponent") else null
+@onready var movement: MovementComponent = $MovementComponent if has_node("MovementComponent") else null
+@onready var animation: AnimationComponent = $AnimationComponent if has_node("AnimationComponent") else null
+@onready var summoner: SummonerComponent = $SummonerComponent if has_node("SummonerComponent") else null
+@onready var merge_manager: SkeletonMergeManager = $SkeletonMergeManager if has_node("SkeletonMergeManager") else null
+@onready var inventory: InventoryComponent = $InventoryComponent if has_node("InventoryComponent") else null
+@onready var inventory_ui: InventoryUI = $InventoryUI if has_node("InventoryUI") else null
+
+# UI
+@onready var health_bar_rect: ColorRect = $HealthBar/HealthBarRect
+@onready var necro_bar_rect: ColorRect = $NecroBar/NecroBarRect
+
+# Configuration export
 @export var speed: float = 200.0
 @export var skeleton_scene: PackedScene = preload("res://scenes/skeleton.tscn")
-@export var summon_cooldown: float = 2
+@export var summon_cooldown: float = 1
+@export var summon_energy_cost: float = 40.0 
+@export var merge_energy_cost: float = 50.0 
 
-@onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
-@onready var health_bar_rect = $HealthBar/HealthBarRect
-@onready var necro_bar_rect = $NecroBar/NecroBarRect
-
-var is_summoning: bool = false
-var current_health: int = max_health
-var last_summon_time: float = 0.0
-var current_direction: int = 0
-var current_state: String = "idle"  # "idle", "walk", "attack"
-var directions = ["south", "south_east", "east", "north_east", 
-				  "north", "north_west", "west", "south_west"]
+# État
+enum State { IDLE, WALKING, ATTACKING }
+var current_state: State = State.IDLE
 
 func _ready():
 	add_to_group("players")
-	# Définir l'animation idle par défaut
-	animated_sprite.play("idle_south")
-	update_health_bar()
+	
+	# Vérifier que les composants sont présents
+	_check_components()
+	
+	_setup_components()
+	_connect_signals()
+	
+	# Configurer l'inventaire UI
+	if inventory and inventory_ui:
+		inventory_ui.setup(inventory)
+		
+		# TEST : Ajouter quelques items de test
+		_add_test_items()
+	
+	# Lancer l'animation idle par défaut
+	if animation:
+		animation.play("idle", "south")
+
+func _check_components():
+	"""Vérifie la présence des composants et affiche des avertissements"""
+	var missing_components = []
+	
+	if not health:
+		missing_components.append("HealthComponent")
+	if not necro_energy:
+		missing_components.append("NecroEnergyComponent")
+	if not movement:
+		missing_components.append("MovementComponent")
+	if not animation:
+		missing_components.append("AnimationComponent")
+	if not summoner:
+		missing_components.append("SummonerComponent")
+	if not merge_manager:
+		missing_components.append("SkeletonMergeManager")
+	if not inventory:
+		missing_components.append("InventoryComponent")
+	if not inventory_ui:
+		missing_components.append("InventoryUI")
+	
+	if missing_components.size() > 0:
+		push_warning("⚠️ Player: Composants manquants: " + ", ".join(missing_components))
+		push_warning("   Ajoutez ces nœuds dans player.tscn pour activer toutes les fonctionnalités")
+
+func _setup_components():
+	"""Configure les composants avec les valeurs appropriées"""
+	if movement:
+		movement.speed = speed
+	
+	if summoner:
+		summoner.summon_scene = skeleton_scene
+		summoner.summon_cooldown = summon_cooldown
+		summoner.summoned_group = "skeletons"
+	
+	if animation:
+		animation.use_8_directions = true
+	
+	if merge_manager:
+		merge_manager.skeleton_scene = skeleton_scene
+		merge_manager.merge_multiplier = 2.0
+		merge_manager.sprite_scale_multiplier = 1.5
+
+func _connect_signals():
+	"""Connecte les signaux des composants"""
+	if health:
+		health.died.connect(_on_died)
+		health.health_changed.connect(_on_health_changed)
+	
+	if necro_energy:
+		necro_energy.energy_changed.connect(_on_necro_energy_changed)
+		necro_energy.energy_consumed.connect(_on_necro_energy_consumed)
+	
+	if summoner:
+		summoner.summon_completed.connect(_on_summon_completed)
+		summoner.summon_failed.connect(_on_summon_failed)
+	
+	if merge_manager:
+		merge_manager.merge_completed.connect(_on_merge_completed)
+		merge_manager.merge_failed.connect(_on_merge_failed)
 
 func _unhandled_input(event):
-	if event.is_action_pressed("sort1"):
-		summon_skeleton()
+	"""Gère les inputs spéciaux (invocation, fusion, inventaire)"""
+	if event.is_action_pressed("toggle_inventory"):
+		_toggle_inventory()
+	elif event.is_action_pressed("sort1"):
+		_summon_skeleton_in_direction()
 	elif event.is_action_pressed("sort2"):
-		merge_skeletons()
+		_merge_skeletons()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			summon_skeleton_at_mouse_position()
+			_summon_skeleton_at_mouse()
 
 func _physics_process(delta):
+	# Invocation continue au clic souris
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		summon_skeleton_at_mouse_position()
-		
+		_summon_skeleton_at_mouse()
+	
+	# Gestion du mouvement
+	_handle_movement_input(delta)
+	
+	# Appliquer le mouvement
+	if movement:
+		movement.apply_movement()
+
+func _handle_movement_input(delta):
+	"""Gère les inputs de mouvement du joueur"""
+	if not movement or not animation:
+		return
+	
 	# Récupérer l'input du joueur
 	var input_vector = Vector2.ZERO
 	
 	input_vector.x = Input.get_axis("ui_left", "ui_right")
 	input_vector.y = Input.get_axis("ui_up", "ui_down")
 	
-	if Input.is_key_pressed(KEY_Q):  # Q = gauche
+	# Clavier ZQSD
+	if Input.is_key_pressed(KEY_Q):
 		input_vector.x -= 1.0
-	if Input.is_key_pressed(KEY_D):  # D = droite
+	if Input.is_key_pressed(KEY_D):
 		input_vector.x += 1.0
-	if Input.is_key_pressed(KEY_Z):  # Z = haut
+	if Input.is_key_pressed(KEY_Z):
 		input_vector.y -= 1.0
-	if Input.is_key_pressed(KEY_S):  # S = bas
+	if Input.is_key_pressed(KEY_S):
 		input_vector.y += 1.0
 	
-	# Vérifier si le joueur attaque (vous pouvez ajouter votre logique d'attaque ici)
-	var is_attacking = false  # À remplacer par votre logique d'attaque
+	# Logique d'attaque (à implémenter plus tard)
+	var is_attacking = false
 	
-	# Normaliser pour un mouvement uniforme en diagonale
+	# Déplacement
 	if input_vector.length() > 0 and not is_attacking:
-		input_vector = input_vector.normalized()
-		velocity = input_vector * speed
-		
-		# Déterminer la direction basée sur l'input
-		update_direction(input_vector)
-		
-		# Mettre à jour l'état
-		current_state = "walk"
-		
-		# Jouer l'animation de marche
-		animated_sprite.play("walk_" + directions[current_direction])
+		movement.move_in_direction(input_vector)
+		animation.set_state("walk")
+		animation.set_direction_from_vector(input_vector)
+		current_state = State.WALKING
 	elif is_attacking:
-		# État d'attaque
-		velocity = Vector2.ZERO
-		current_state = "attack"
-		animated_sprite.play("attack_" + directions[current_direction])
+		movement.stop()
+		animation.set_state("attack")
+		current_state = State.ATTACKING
 	else:
-		# Pas de mouvement, jouer l'animation idle
-		velocity = Vector2.ZERO
-		current_state = "idle"
-		animated_sprite.play("idle_" + directions[current_direction])
-	
-	# Appliquer le mouvement
-	move_and_slide()
+		movement.stop()
+		animation.set_state("idle")
+		current_state = State.IDLE
 
-func summon_skeleton():
-	"""Invoque un nouveau skeleton devant le joueur dans sa direction"""
-	# Vérifier le cooldown et éviter les doubles invocations
-	var current_time = Time.get_ticks_msec() / 1000.0
-	if current_time - last_summon_time < summon_cooldown or is_summoning:
+func _summon_skeleton_in_direction():
+	"""Invoque un skeleton dans la direction du joueur"""
+	if not summoner or not animation:
 		return
 	
-	is_summoning = true
+	# Vérifier si le sort peut être appliqué (cooldown, etc.)
+	if not summoner.can_summon():
+		return  # En cooldown, ne pas consommer d'énergie
 	
-	if not skeleton_scene:
-		print("Erreur: Scène skeleton non chargée")
-		is_summoning = false
+	# Vérifier et consommer l'énergie UNIQUEMENT si le sort peut être lancé
+	if necro_energy and not necro_energy.can_consume(summon_energy_cost):
+		print("⚡ Pas assez d'énergie pour invoquer (", necro_energy.current_energy, "/", summon_energy_cost, ")")
 		return
 	
-	var skeleton_instance = skeleton_scene.instantiate()
-	if not skeleton_instance:
-		print("Erreur: Impossible d'instancier le skeleton")
-		is_summoning = false
-		return
+	# Consommer l'énergie
+	if necro_energy:
+		necro_energy.consume_energy(summon_energy_cost)
 	
-	var scene_root = get_tree().current_scene
-	if not scene_root:
-		print("Erreur: Scène actuelle non trouvée")
-		is_summoning = false
-		return
-	
-	var follow_distance = skeleton_instance.get("follow_distance")
-	if follow_distance == null:
-		follow_distance = 30.0
-	
-	var player_direction = get_direction_vector()
-	
-	# Ajouter un petit offset aléatoire pour éviter que plusieurs skeletons spawnent au même endroit
-	var random_offset = Vector2(randf_range(-5.0, 5.0), randf_range(-5.0, 5.0))
-	var spawn_position = global_position + player_direction * follow_distance + random_offset
-	
-	# Vérifier qu'il n'y a pas déjà un skeleton à cette position
-	var existing_skeletons = get_tree().get_nodes_in_group("skeletons")
-	var min_distance = 10.0  # Distance minimale entre skeletons au spawn
-	var valid_position = false
-	var attempts = 0
-	var max_attempts = 10
-	
-	while not valid_position and attempts < max_attempts:
-		valid_position = true
-		for skeleton in existing_skeletons:
-			if is_instance_valid(skeleton):
-				var dist = spawn_position.distance_to(skeleton.global_position)
-				if dist < min_distance:
-					# Position trop proche, générer un nouvel offset
-					random_offset = Vector2(randf_range(-10.0, 10.0), randf_range(-10.0, 10.0))
-					spawn_position = global_position + player_direction * follow_distance + random_offset
-					valid_position = false
-					attempts += 1
-					break
-		
-		if valid_position:
-			break
-	
-	scene_root.add_child(skeleton_instance)
-	skeleton_instance.global_position = spawn_position
-	
-	await get_tree().process_frame
-	
-	last_summon_time = current_time
-	is_summoning = false
-	
-	
-func summon_skeleton_at_mouse_position():
-	"""Invoque un skeleton à la position de la souris (dans la limite de follow_distance)"""
-	# Vérifier le cooldown et éviter les doubles invocations
-	var current_time = Time.get_ticks_msec() / 1000.0
-	if current_time - last_summon_time < summon_cooldown or is_summoning:
-		return
-	
-	is_summoning = true
-	
-	if not skeleton_scene:
-		print("Erreur: Scène skeleton non chargée")
-		is_summoning = false
-		return
-	
-	var skeleton_instance = skeleton_scene.instantiate()
-	if not skeleton_instance:
-		print("Erreur: Impossible d'instancier le skeleton")
-		is_summoning = false
-		return
-	
-	var scene_root = get_tree().current_scene
-	if not scene_root:
-		print("Erreur: Scène actuelle non trouvée")
-		is_summoning = false
-		return
-	
-	var follow_distance = skeleton_instance.get("follow_distance")
-	if follow_distance == null:
-		follow_distance = 30.0
-	
-	# Obtenir la position de la souris dans le monde
-	var mouse_position = get_global_mouse_position()
-	
-	# Calculer la direction du joueur vers la souris
-	var direction_to_mouse = (mouse_position - global_position).normalized()
-	
-	# Calculer la position de spawn à follow_distance du joueur dans la direction de la souris
-	# Ajouter un petit offset aléatoire pour éviter les collisions
-	var random_offset = Vector2(randf_range(-5.0, 5.0), randf_range(-5.0, 5.0))
-	var spawn_position = global_position + direction_to_mouse * follow_distance + random_offset
-	
-	# Vérifier qu'il n'y a pas déjà un skeleton à cette position
-	var existing_skeletons = get_tree().get_nodes_in_group("skeletons")
-	var min_distance = 10.0  # Distance minimale entre skeletons au spawn
-	var valid_position = false
-	var attempts = 0
-	var max_attempts = 10
-	
-	while not valid_position and attempts < max_attempts:
-		valid_position = true
-		for skeleton in existing_skeletons:
-			if is_instance_valid(skeleton):
-				var dist = spawn_position.distance_to(skeleton.global_position)
-				if dist < min_distance:
-					# Position trop proche, générer un nouvel offset
-					random_offset = Vector2(randf_range(-10.0, 10.0), randf_range(-10.0, 10.0))
-					spawn_position = global_position + direction_to_mouse * follow_distance + random_offset
-					valid_position = false
-					attempts += 1
-					break
-		
-		if valid_position:
-			break
-	
-	scene_root.add_child(skeleton_instance)
-	skeleton_instance.global_position = spawn_position
-	
-	await get_tree().process_frame
-	
-	last_summon_time = current_time
-	is_summoning = false
-	
-	
-func merge_skeletons():
-	"""Fusionne les skeletons par paires de 2, uniquement ceux du même niveau de merge"""
-	if not skeleton_scene:
-		print("Erreur: Scène skeleton non chargée")
-		return
-	
-	# Récupérer tous les skeletons dans la scène
-	var skeletons = get_tree().get_nodes_in_group("skeletons")
-	var valid_skeletons = []
-	
-	# Filtrer les skeletons valides
-	for skeleton in skeletons:
-		if is_instance_valid(skeleton):
-			valid_skeletons.append(skeleton)
-	
-	# Il faut au moins 2 skeletons pour fusionner
-	if valid_skeletons.size() < 2:
-		print("Pas assez de skeletons pour fusionner (minimum 2 requis)")
-		return
-	
-	# Grouper les skeletons par niveau de merge
-	var skeletons_by_level = {}
-	for skeleton in valid_skeletons:
-		var level = skeleton.get("merge_level")
-		if level == null:
-			level = 0  # Par défaut niveau 0
-		
-		if not skeletons_by_level.has(level):
-			skeletons_by_level[level] = []
-		skeletons_by_level[level].append(skeleton)
-	
-	# Fusionner les skeletons niveau par niveau
-	var total_merged = 0
-	for level in skeletons_by_level.keys():
-		var skeletons_at_level = skeletons_by_level[level]
-		
-		# Il faut au moins 2 skeletons de ce niveau pour fusionner
-		if skeletons_at_level.size() < 2:
-			continue
-		
-		# Grouper par paires (prendre les 2 premiers, puis les 2 suivants, etc.)
-		var pairs_to_merge = []
-		for i in range(0, skeletons_at_level.size(), 2):
-			if i + 1 < skeletons_at_level.size():
-				# Paire complète du même niveau
-				pairs_to_merge.append([skeletons_at_level[i], skeletons_at_level[i + 1]])
-		
-		# Fusionner chaque paire de ce niveau
-		for pair in pairs_to_merge:
-			var skeleton1 = pair[0]
-			var skeleton2 = pair[1]
-			
-			# Vérifier que les deux ont bien le même niveau (sécurité supplémentaire)
-			var level1 = skeleton1.get("merge_level")
-			var level2 = skeleton2.get("merge_level")
-			if level1 == null:
-				level1 = 0
-			if level2 == null:
-				level2 = 0
-			
-			if level1 != level2:
-				print("Erreur: Les skeletons n'ont pas le même niveau de merge")
-				continue
-			
-			# Calculer la position moyenne entre les 2 skeletons
-			var merge_position = (skeleton1.global_position + skeleton2.global_position) / 2.0
-			
-			# Créer le nouveau skeleton mergé
-			var merged_skeleton = skeleton_scene.instantiate()
-			if not merged_skeleton:
-				continue
-			
-			# Multiplier les stats par 2
-			merged_skeleton.max_health = skeleton1.max_health * 2
-			merged_skeleton.speed = skeleton1.speed
-			merged_skeleton.follow_distance = skeleton1.follow_distance
-			merged_skeleton.distance_tolerance = skeleton1.distance_tolerance
-			merged_skeleton.attack_range = skeleton1.attack_range
-			merged_skeleton.damage = skeleton1.damage * 2
-			merged_skeleton.attack_cooldown = skeleton1.attack_cooldown
-			merged_skeleton.attack_duration = skeleton1.attack_duration
-			merged_skeleton.enemy_detection_range = skeleton1.enemy_detection_range
-			merged_skeleton.max_necro_energy = skeleton1.max_necro_energy * 2.0
-			
-			# Initialiser la santé et l'énergie noire
-			merged_skeleton.current_health = merged_skeleton.max_health
-			merged_skeleton.current_necro_energy = merged_skeleton.max_necro_energy  # Reset à max
-			
-			# Doubler la taille (scale x2)
-			merged_skeleton.scale = skeleton1.scale * 2.0
-			
-			# Incrémenter le niveau de merge
-			merged_skeleton.merge_level = level1 + 1
-			
-			# Ajouter à la scène
-			var scene_root = get_tree().current_scene
-			if scene_root:
-				scene_root.add_child(merged_skeleton)
-				merged_skeleton.global_position = merge_position
-				
-				# Mettre à jour les barres après l'ajout
-				await get_tree().process_frame
-				merged_skeleton.update_health_bar()
-				merged_skeleton.update_necro_bar()
-			
-			# Supprimer les 2 skeletons originaux
-			skeleton1.queue_free()
-			skeleton2.queue_free()
-			total_merged += 1
-	
-	if total_merged > 0:
-		print("Fusion de ", total_merged, " paire(s) de skeletons effectuée")
-	else:
-		print("Aucune fusion possible : pas assez de skeletons du même niveau")
-		
-		
-func get_direction_vector() -> Vector2:
-	"""
-	Retourne le vecteur de direction normalisé basé sur current_direction
-	"""
-	match current_direction:
-		0: return Vector2(0, 1)      # south
-		1: return Vector2(1, 1).normalized()   # south_east
-		2: return Vector2(1, 0)      # east
-		3: return Vector2(1, -1).normalized()  # north_east
-		4: return Vector2(0, -1)    # north
-		5: return Vector2(-1, -1).normalized() # north_west
-		6: return Vector2(-1, 0)     # west
-		7: return Vector2(-1, 1).normalized()    # south_west
-		_: return Vector2(0, 1)
-
-func get_position_behind(distance: float = 50.0) -> Vector2:
-	"""
-	Calcule la position derrière le joueur selon sa direction actuelle
-	"""
 	var direction = get_direction_vector()
-	# Inverser la direction pour obtenir "derrière"
-	var behind_direction = -direction
-	return global_position + (behind_direction * distance)
+	summoner.summon_at_direction(direction)
+
+func _summon_skeleton_at_mouse():
+	"""Invoque un skeleton à la position de la souris"""
+	if not summoner:
+		return
+	
+	# Vérifier si le sort peut être appliqué (cooldown, etc.)
+	if not summoner.can_summon():
+		return  # En cooldown, ne pas consommer d'énergie
+	
+	# Vérifier et consommer l'énergie UNIQUEMENT si le sort peut être lancé
+	if necro_energy and not necro_energy.can_consume(summon_energy_cost):
+		print("⚡ Pas assez d'énergie pour invoquer (", necro_energy.current_energy, "/", summon_energy_cost, ")")
+		return
+	
+	# Consommer l'énergie
+	if necro_energy:
+		necro_energy.consume_energy(summon_energy_cost)
+	
+	var mouse_position = get_global_mouse_position()
+	summoner.summon_at_position(mouse_position)
+
+func _merge_skeletons():
+	"""Fusionne les skeletons par paires de même niveau"""
+	if not merge_manager:
+		print("⚠️ SkeletonMergeManager non trouvé")
+		return
+	
+	# Vérifier s'il y a assez de skeletons AVANT de consommer l'énergie
+	var skeleton_count = _count_valid_skeletons()
+	if skeleton_count < 2:
+		print("⚠️ Pas assez de skeletons pour fusionner (", skeleton_count, "/2)")
+		return  # Ne pas consommer d'énergie
+	
+	# Vérifier et consommer l'énergie UNIQUEMENT si le sort peut être lancé
+	if necro_energy and not necro_energy.can_consume(merge_energy_cost):
+		print("⚡ Pas assez d'énergie pour fusionner (", necro_energy.current_energy, "/", merge_energy_cost, ")")
+		return
+	
+	# Consommer l'énergie
+	if necro_energy:
+		necro_energy.consume_energy(merge_energy_cost)
+	
+	print("🔀 MERGE: Début de la fusion des skeletons")
+	
+	# Déléguer toute la logique de fusion au composant
+	await merge_manager.merge_skeletons("skeletons")
+
+
+# ========== Méthodes utilitaires ==========
+
+func _count_valid_skeletons() -> int:
+	"""Compte le nombre de skeletons valides dans le groupe"""
+	var skeletons = get_tree().get_nodes_in_group("skeletons")
+	var count = 0
+	
+	for skeleton in skeletons:
+		if is_instance_valid(skeleton) and not skeleton.is_queued_for_deletion():
+			count += 1
+	
+	return count
+
+func get_direction_vector() -> Vector2:
+	"""Retourne le vecteur de direction du joueur"""
+	if animation:
+		var direction = animation.get_current_direction()
+		match direction:
+			"south": return Vector2(0, 1)
+			"south_east": return Vector2(1, 1).normalized()
+			"east": return Vector2(1, 0)
+			"north_east": return Vector2(1, -1).normalized()
+			"north": return Vector2(0, -1)
+			"north_west": return Vector2(-1, -1).normalized()
+			"west": return Vector2(-1, 0)
+			"south_west": return Vector2(-1, 1).normalized()
+	
+	return Vector2(0, 1)  # Défaut: sud
 
 func get_cardinal_direction() -> String:
-	"""
-	Convertit les 8 directions en 4 directions cardinales
-	Retourne: "north", "south", "east", "west"
-	"""
-	match current_direction:
-		0: return "south"      # south
-		1: return "south"      # south_east -> south
-		2: return "east"       # east
-		3: return "north"      # north_east -> north
-		4: return "north"      # north
-		5: return "north"      # north_west -> north
-		6: return "west"       # west
-		7: return "south"      # south_west -> south
-		_: return "south"
+	"""Retourne la direction cardinale (4 directions)"""
+	if animation:
+		return animation.get_cardinal_direction()
+	return "south"
 
-func update_direction(input_vector: Vector2):
-	"""
-	Convertit un vecteur de direction en index de direction (0-7)
-	Méthode basée sur les composantes X et Y plutôt que sur l'angle
-	"""
-	# Déterminer la direction principale (cardinale)
-	var primary_x = 0
-	var primary_y = 0
-	
-	if abs(input_vector.x) > abs(input_vector.y):
-		# Mouvement principalement horizontal
-		primary_x = sign(input_vector.x)
-		primary_y = 0
-	else:
-		# Mouvement principalement vertical
-		primary_x = 0
-		primary_y = sign(input_vector.y)
-	
-	# Si les deux composantes sont significatives, c'est une diagonale
-	if abs(input_vector.x) > 0.3 and abs(input_vector.y) > 0.3:
-		primary_x = sign(input_vector.x)
-		primary_y = sign(input_vector.y)
-	
-	# Mapper les composantes à l'index de direction
-	# directions = ["south", "south_east", "east", "north_east", 
-	#               "north", "north_west", "west", "south_west"]
-	# Index:        0         1           2        3
-	#               4         5           6        7
-	
-	if primary_y > 0:  # Sud
-		if primary_x > 0:      # Sud-Est
-			current_direction = 1
-		elif primary_x < 0:     # Sud-Ouest
-			current_direction = 7
-		else:                  # Sud
-			current_direction = 0
-	elif primary_y < 0:  # Nord
-		if primary_x > 0:      # Nord-Est
-			current_direction = 3
-		elif primary_x < 0:     # Nord-Ouest
-			current_direction = 5
-		else:                  # Nord
-			current_direction = 4
-	else:  # Horizontal uniquement
-		if primary_x > 0:      # Est
-			current_direction = 2
-		else:                  # Ouest
-			current_direction = 6
+# ========== Callbacks des signaux ==========
 
-func update_health_bar():
-	"""Met à jour l'affichage de la barre de vie"""
-	if health_bar_rect:
-		var health_percentage = float(current_health) / float(max_health)
+func _on_died():
+	"""Appelé quand la santé atteint 0"""
+	print("Joueur détruit! Game Over")
+	queue_free()
+
+func _on_health_changed(current: int, maximum: int):
+	"""Met à jour la barre de vie"""
+	if health_bar_rect and health_bar_rect.get_parent():
+		var health_percentage = float(current) / float(maximum)
 		health_bar_rect.size.x = health_bar_rect.get_parent().size.x * health_percentage
+
+func _on_necro_energy_changed(current: float, maximum: float):
+	"""Met à jour la barre d'énergie nécromantique"""
+	if necro_bar_rect and necro_bar_rect.get_parent():
+		var energy_percentage = current / maximum
+		necro_bar_rect.size.x = necro_bar_rect.get_parent().size.x * energy_percentage
+
+func _on_necro_energy_consumed(amount: float, remaining: float):
+	"""Appelé quand de l'énergie est consommée"""
+	print("⚡ Énergie consommée: -", amount, " (reste: ", remaining, ")")
+
+func _on_summon_completed(summoned_entity: Node):
+	"""Appelé quand une invocation réussit"""
+	pass
+
+func _on_summon_failed(reason: String):
+	"""Appelé quand une invocation échoue"""
+	pass
+
+func _on_merge_completed(merged_count: int):
+	"""Appelé quand une fusion réussit"""
+	if merged_count > 0:
+		print("✅ Fusion de ", merged_count, " paire(s) de skeletons effectuée")
+
+func _on_merge_failed(reason: String):
+	"""Appelé quand une fusion échoue"""
+	print("⚠️ ", reason)
+
+# ========== Gestion de l'inventaire ==========
+
+func _toggle_inventory():
+	"""Ouvre/ferme l'inventaire"""
+	if not inventory_ui:
+		return
+	
+	if inventory_ui.visible:
+		inventory_ui.close_inventory()
+	else:
+		inventory_ui.open_inventory()
+
+func _add_test_items():
+	"""Ajoute quelques items de test à l'inventaire"""
+	if not inventory:
+		return
+	
+	# Potion de vie
+	var health_potion = Item.new()
+	health_potion.id = "health_potion"
+	health_potion.name = "Potion de Vie"
+	health_potion.description = "Restaure 50 HP"
+	health_potion.item_type = Item.ItemType.POTION
+	health_potion.stackable = true
+	health_potion.max_stack = 10
+	inventory.add_item(health_potion, 3)
+	
+	# Potion de mana
+	var mana_potion = Item.new()
+	mana_potion.id = "mana_potion"
+	mana_potion.name = "Potion de Mana"
+	mana_potion.description = "Restaure 30 énergie nécromantique"
+	mana_potion.item_type = Item.ItemType.POTION
+	mana_potion.stackable = true
+	mana_potion.max_stack = 10
+	inventory.add_item(mana_potion, 5)
+	
+	# Sort de feu
+	var fire_spell = Item.new()
+	fire_spell.id = "fire_spell"
+	fire_spell.name = "Sort de Feu"
+	fire_spell.description = "Lance une boule de feu dévastatrice"
+	fire_spell.item_type = Item.ItemType.GRIMOIRE
+	fire_spell.stackable = false
+	inventory.add_item(fire_spell, 1)
+	
+	# Clé rouillée
+	var rusty_key = Item.new()
+	rusty_key.id = "rusty_key"
+	rusty_key.name = "Clé Rouillée"
+	rusty_key.description = "Une vieille clé qui pourrait ouvrir quelque chose..."
+	rusty_key.item_type = Item.ItemType.OBJECT
+	rusty_key.stackable = false
+	inventory.add_item(rusty_key, 1)
+	
+	# Gemme rare
+	var rare_gem = Item.new()
+	rare_gem.id = "rare_gem"
+	rare_gem.name = "Gemme d'Améthyste"
+	rare_gem.description = "Une gemme précieuse qui brille d'une lueur violette"
+	rare_gem.item_type = Item.ItemType.RARE_OBJECT
+	rare_gem.stackable = true
+	rare_gem.max_stack = 99
+	inventory.add_item(rare_gem, 2)
+	
+	print("🎒 Items de test ajoutés à l'inventaire")
+
+# ========== API publique (pour compatibilité) ==========
 
 func take_damage(amount: int):
 	"""Inflige des dégâts au joueur"""
-	current_health -= amount
-	print("Joueur prend ", amount, " dégâts. Santé: ", current_health, "/", max_health)
-	
-	update_health_bar()
-	
-	if current_health <= 0:
-		die()
-
-func die():
-	"""Détruit le joueur (game over)"""
-	print("Joueur détruit! Game Over")
-	queue_free()
+	if health:
+		health.take_damage(amount)
+		print("Joueur prend ", amount, " dégâts. Santé: ", health.current_health, "/", health.max_health)

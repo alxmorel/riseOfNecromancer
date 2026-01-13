@@ -1,7 +1,12 @@
-[gd_scene load_steps=69 format=3 uid="uid://ccfhmbn6gh3gl"]
+[gd_scene load_steps=74 format=3 uid="uid://ccfhmbn6gh3gl"]
 
 [ext_resource type="Script" uid="uid://bjrwff8n6bg2i" path="res://scenes/enemy.gd" id="1_7p1mj"]
 [ext_resource type="Texture2D" uid="uid://bycqxkvm2oekm" path="res://assets/characters/goblin/character-spritesheet (1).png" id="2_md0e3"]
+[ext_resource type="Script" uid="uid://yqq1rdk67dfj" path="res://components/health_component.gd" id="2_health"]
+[ext_resource type="Script" uid="uid://d1a6wxiji1wmc" path="res://components/movement_component.gd" id="2_movement"]
+[ext_resource type="Script" uid="uid://c2ud75cith27u" path="res://components/animation_component.gd" id="2_animation"]
+[ext_resource type="Script" uid="uid://c0m8mb3w3rn8e" path="res://components/combat_component.gd" id="2_combat"]
+[ext_resource type="Script" uid="uid://dflh4ljkcdc0r" path="res://components/target_detection_component.gd" id="2_target"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_md0e3"]
 atlas = ExtResource("2_md0e3")
@@ -561,3 +566,30 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.029181577, 0.99999994, 0.48696065, 1)
+
+[node name="HealthComponent" type="Node" parent="."]
+script = ExtResource("2_health")
+max_health = 60
+
+[node name="MovementComponent" type="Node" parent="."]
+script = ExtResource("2_movement")
+speed = 150.0
+
+[node name="AnimationComponent" type="Node" parent="."]
+script = ExtResource("2_animation")
+use_8_directions = false
+
+[node name="CombatComponent" type="Node" parent="."]
+script = ExtResource("2_combat")
+damage = 10
+attack_range = 15.0
+attack_cooldown = 1.5
+attack_duration = 0.6
+detection_range = 300.0
+
+[node name="TargetDetectionComponent" type="Node" parent="."]
+script = ExtResource("2_target")
+detection_range = 300.0
+update_interval = 0.5
+target_groups = Array[String](["skeletons", "players"])
+auto_update = true

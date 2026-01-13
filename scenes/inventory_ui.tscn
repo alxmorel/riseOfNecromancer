@@ -1,0 +1,72 @@
+[gd_scene load_steps=2 format=3 uid="uid://cryv6bttrklb3"]
+
+[ext_resource type="Script" path="res://scenes/inventory_ui.gd" id="1_tahbm"]
+
+[node name="InventoryUI" type="CanvasLayer"]
+process_mode = 3
+script = ExtResource("1_tahbm")
+
+[node name="Panel" type="Panel" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -300.0
+offset_right = 400.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Header" type="HBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="CategoryLabel" type="Label" parent="Panel/VBoxContainer/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Inventaire - Potions"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CloseButton" type="Button" parent="Panel/VBoxContainer/Header"]
+layout_mode = 2
+text = "X"
+
+[node name="Categories" type="HBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="PotionsButton" type="Button" parent="Panel/VBoxContainer/Categories"]
+layout_mode = 2
+text = "Potions"
+
+[node name="ObjectsButton" type="Button" parent="Panel/VBoxContainer/Categories"]
+layout_mode = 2
+text = "Objets"
+
+[node name="GrimoireButton" type="Button" parent="Panel/VBoxContainer/Categories"]
+layout_mode = 2
+text = "Grimoire"
+
+[node name="RareObjectsButton" type="Button" parent="Panel/VBoxContainer/Categories"]
+layout_mode = 2
+text = "Objets Rares"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ItemsGrid" type="GridContainer" parent="Panel/VBoxContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+columns = 5

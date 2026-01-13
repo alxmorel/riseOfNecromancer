@@ -1,272 +1,206 @@
 extends CharacterBody2D
 
-@export var max_health: int = 60
-var current_health: int = max_health
+## Enemy - Ennemi qui attaque les skeletons et le joueur
+## Architecture modulaire basée sur des composants
 
-# Vitesse de déplacement
-@export var speed: float = 150.0
+# Composants (optionnels pour migration progressive)
+@onready var health: HealthComponent = $HealthComponent if has_node("HealthComponent") else null
+@onready var combat: CombatComponent = $CombatComponent if has_node("CombatComponent") else null
+@onready var movement: MovementComponent = $MovementComponent if has_node("MovementComponent") else null
+@onready var animation: AnimationComponent = $AnimationComponent if has_node("AnimationComponent") else null
+@onready var target_detection: TargetDetectionComponent = $TargetDetectionComponent if has_node("TargetDetectionComponent") else null
 
-# Distance d'attaque (portée de mêlée)
-@export var attack_range: float = 15.0
-
-# Dégâts infligés
-@export var damage: int = 10
-
-# Cooldown entre les attaques (en secondes)
-@export var attack_cooldown: float = 1.5
-var last_attack_time: float = 0.0
-
-@export var attack_duration: float = 0.6
-
-# Portée de détection (distance à laquelle l'ennemi détecte les cibles)
-@export var detection_range: float = 300.0
-
-@onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
+# UI
 @onready var health_bar_rect: ColorRect = $HealthBar/HealthBarRect
 
-var attack_timer: float = 0.0
-var is_attacking: bool = false
-var target: CharacterBody2D = null
-var current_direction: String = "south"
-var current_state: String = "idle"  # "idle", "walk", "attack"
-var target_update_timer: float = 0.0
-var target_update_interval: float = 0.5  # Mettre à jour la cible toutes les 0.5 secondes
+# Configuration export pour l'éditeur
+@export var speed: float = 150.0
+
+# État
+enum State { IDLE, CHASING, ATTACKING }
+var current_state: State = State.IDLE
 
 func _ready():
 	add_to_group("enemies")
-	if animated_sprite:
-		animated_sprite.play("idle_south")
-		
-	update_health_bar()
+	
+	# Vérifier que les composants sont présents
+	_check_components()
+	
+	_setup_components()
+	_connect_signals()
+	
+	# Lancer l'animation idle par défaut
+	if animation:
+		animation.play("idle", "south")
+
+func _check_components():
+	"""Vérifie la présence des composants et affiche des avertissements"""
+	var missing_components = []
+	
+	if not health:
+		missing_components.append("HealthComponent")
+	if not movement:
+		missing_components.append("MovementComponent")
+	if not animation:
+		missing_components.append("AnimationComponent")
+	if not combat:
+		missing_components.append("CombatComponent")
+	if not target_detection:
+		missing_components.append("TargetDetectionComponent")
+	
+	if missing_components.size() > 0:
+		push_warning("⚠️ Enemy: Composants manquants: " + ", ".join(missing_components))
+		push_warning("   Ajoutez ces nœuds dans enemy.tscn pour activer toutes les fonctionnalités")
+		push_warning("   Voir COMPOSANTS_MIGRATION_GUIDE.md pour les instructions")
+
+func _setup_components():
+	"""Configure les composants avec les valeurs appropriées"""
+	# Configurer la détection de cibles (priorité: skeletons > joueur)
+	if target_detection:
+		target_detection.set_target_groups_by_priority(["skeletons", "players"])
+	
+	# Configurer le mouvement
+	if movement:
+		movement.speed = speed
+
+func _connect_signals():
+	"""Connecte les signaux des composants"""
+	if health:
+		health.died.connect(_on_died)
+		health.health_changed.connect(_on_health_changed)
+	
+	if combat:
+		combat.attack_started.connect(_on_attack_started)
+		combat.attack_finished.connect(_on_attack_finished)
+		combat.enemy_hit.connect(_on_enemy_hit)
+	
+	if target_detection:
+		target_detection.target_acquired.connect(_on_target_acquired)
+		target_detection.target_lost.connect(_on_target_lost)
 
 func _physics_process(delta):
-	# Gérer le timer d'attaque
-	if is_attacking:
-		attack_timer -= delta
-		if attack_timer <= 0.0:
-			is_attacking = false
-			current_state = "idle"
-	
-	# Mettre à jour le timer de recherche de cible
-	target_update_timer += delta
-	if target_update_timer >= target_update_interval:
-		find_target()
-		target_update_timer = 0.0
-	
-	# Si pas de cible, rester en idle
-	if target == null:
-		if not is_attacking:
-			current_state = "idle"
-		velocity = Vector2.ZERO
-		play_animation()
-		move_and_slide()  # Un seul appel ici
+	_update_state()
+	_process_current_state(delta)
+
+func _update_state():
+	"""Met à jour l'état en fonction du contexte"""
+	if not combat or not target_detection:
 		return
 	
-	# Vérifier si la cible est toujours valide (pas détruite)
-	if not is_instance_valid(target):
-		target = null
-		return
+	# Synchroniser la cible du combat avec la détection
+	var detected_target = target_detection.get_target()
 	
-	# Si on est en train d'attaquer, ne pas bouger
-	if is_attacking:
-		velocity = Vector2.ZERO
-		play_animation()
-		move_and_slide()  # Un seul appel ici
-		return
-	
-	# Calculer la distance à la cible
-	var distance_to_target = global_position.distance_to(target.global_position)
-	
-	# Vérifier si on est à portée d'attaque
-	if distance_to_target <= attack_range:
-		# Attaquer la cible
-		try_attack()
-		velocity = Vector2.ZERO
+	# Vérifier que la cible est valide avant de l'assigner
+	if detected_target and is_instance_valid(detected_target) and not detected_target.is_queued_for_deletion():
+		combat.target = detected_target
 	else:
-		# Se déplacer vers la cible (move_towards_target() appelle déjà move_and_slide())
-		move_towards_target(delta)
+		combat.target = null
 	
-	# Jouer l'animation appropriée
-	play_animation()
+	# Déterminer le nouvel état
+	if not target_detection.has_target():
+		current_state = State.IDLE
+	elif combat.is_in_range(global_position):
+		current_state = State.ATTACKING
+	else:
+		current_state = State.CHASING
+
+func _process_current_state(delta):
+	"""Traite la logique de l'état actuel"""
+	match current_state:
+		State.IDLE:
+			_process_idle()
+		State.CHASING:
+			_process_chasing()
+		State.ATTACKING:
+			_process_attacking()
+
+func _process_idle():
+	"""État idle - attendre"""
+	if movement:
+		movement.stop()
 	
-	
-func find_target():
-	"""
-	Trouve une cible selon la priorité :
-	1. Acolytes (skeletons) en priorité
-	2. Joueur si aucun acolyte
-	"""
-	var skeletons = get_tree().get_nodes_in_group("skeletons")
-	var players = get_tree().get_nodes_in_group("players")
-	
-	# Filtrer les skeletons valides et à portée
-	var valid_skeletons = []
-	for skeleton in skeletons:
-		if is_instance_valid(skeleton):
-			var distance = global_position.distance_to(skeleton.global_position)
-			if distance <= detection_range:
-				valid_skeletons.append(skeleton)
-	
-	# Priorité 1 : Attaquer les acolytes (skeletons) s'il y en a
-	if valid_skeletons.size() > 0:
-		# Trouver le skeleton le plus proche
-		var closest_skeleton = null
-		var closest_distance = INF
-		
-		for skeleton in valid_skeletons:
-			var distance = global_position.distance_to(skeleton.global_position)
-			if distance < closest_distance:
-				closest_distance = distance
-				closest_skeleton = skeleton
-		
-		target = closest_skeleton
+	if animation:
+		animation.set_state("idle")
+
+func _process_chasing():
+	"""État de poursuite de la cible"""
+	if not target_detection or not movement or not animation:
 		return
 	
-	# Priorité 2 : Attaquer le joueur s'il n'y a plus d'acolytes
-	if players.size() > 0:
-		var player = players[0]
-		if is_instance_valid(player):
-			var distance = global_position.distance_to(player.global_position)
-			if distance <= detection_range:
-				target = player
-				return
-	
-	# Pas de cible trouvée
-	target = null
-
-func move_towards_target(delta):
-	"""Se déplace vers la cible avec contournement des obstacles"""
-	if target == null or not is_instance_valid(target):
-		velocity = Vector2.ZERO
+	var target = target_detection.get_target()
+	if not target:
 		return
 	
-	# Calculer la direction vers la cible
-	var direction = (target.global_position - global_position).normalized()
+	# Se déplacer vers la cible
+	movement.move_towards(target.global_position)
+	movement.apply_movement()
 	
-	# Appliquer la vitesse normale
-	velocity = direction * speed
-	
-	# Appliquer le mouvement UNE SEULE FOIS
-	move_and_slide()
-	
-	# Vérifier si on est bloqué APRÈS le mouvement
-	if get_slide_collision_count() > 0:
-		var collision = get_slide_collision(0)
-		if collision:
-			var normal = collision.get_normal()
-			
-			# Calculer une direction de contournement pour le prochain frame
-			var slide_direction = direction.slide(normal).normalized()
-			
-			# Si la direction de glissement est valide, l'utiliser pour le prochain mouvement
-			if slide_direction.length() > 0.1:
-				velocity = slide_direction * speed
-			else:
-				# Si le glissement ne fonctionne pas, essayer de contourner par la gauche ou droite
-				var perp_vector = Vector2(-normal.y, normal.x)  # Vecteur perpendiculaire
-				
-				# Choisir la direction qui rapproche le plus de la cible
-				var left_direction = (direction + perp_vector).normalized()
-				var right_direction = (direction - perp_vector).normalized()
-				
-				var left_distance = (global_position + left_direction * 20.0).distance_to(target.global_position)
-				var right_distance = (global_position + right_direction * 20.0).distance_to(target.global_position)
-				
-				var best_direction = left_direction if left_distance < right_distance else right_direction
-				velocity = best_direction * speed
-	
-	# Mettre à jour la direction pour l'animation
-	update_direction(velocity.normalized() if velocity.length() > 0.1 else direction)
-	
-	# Mettre à jour l'état
-	current_state = "walk"
+	# Mettre à jour l'animation
+	animation.set_state("walk")
+	if movement.is_moving():
+		animation.set_direction_from_vector(movement.get_direction())
 
-func try_attack():
-	"""Tente d'attaquer la cible si le cooldown est terminé"""
-	var current_time = Time.get_ticks_msec() / 1000.0
+func _process_attacking():
+	"""État d'attaque"""
+	if not combat or not movement or not animation:
+		return
 	
-	if current_time - last_attack_time >= attack_cooldown:
-		# Attaquer
-		attack_target()
-		last_attack_time = current_time
-		is_attacking = true
-		attack_timer = attack_duration
-		current_state = "attack"
+	# Tenter d'attaquer
+	if combat.try_attack(global_position):
+		movement.stop()
 	else:
 		# En cooldown, s'arrêter et regarder la cible
-		velocity = Vector2.ZERO
-		if not is_attacking:
-			current_state = "idle"
-		# Mettre à jour la direction vers la cible
-		if target:
-			var direction = (target.global_position - global_position).normalized()
-			update_direction(direction)
+		movement.stop()
+		if not combat.is_attacking:
+			animation.set_state("idle")
+		
+		# Regarder vers la cible
+		var direction = combat.get_direction_to_target(global_position)
+		if direction != Vector2.ZERO:
+			animation.set_direction_from_vector(direction)
+	
+	# Appliquer le mouvement (pour les collisions si nécessaire)
+	if movement:
+		movement.apply_movement()
 
-func attack_target():
-	"""Attaque la cible actuelle"""
-	if target == null or not is_instance_valid(target):
-		return
-	
-	# Calculer la direction vers la cible pour l'animation
-	var direction = (target.global_position - global_position).normalized()
-	update_direction(direction)
-	
-	# Infliger des dégâts à la cible
-	if target.has_method("take_damage"):
-		target.take_damage(damage)
-	
-	# S'arrêter pendant l'attaque
-	velocity = Vector2.ZERO
-	
-	print("Ennemi attaque ", target.name, " pour ", damage, " dégâts")
+# ========== Callbacks des signaux ==========
+
+func _on_died():
+	"""Appelé quand la santé atteint 0"""
+	print("Ennemi détruit!")
+	queue_free()
+
+func _on_health_changed(current: int, maximum: int):
+	"""Met à jour la barre de vie"""
+	if health_bar_rect and health_bar_rect.get_parent():
+		var health_percentage = float(current) / float(maximum)
+		health_bar_rect.size.x = health_bar_rect.get_parent().size.x * health_percentage
+
+func _on_attack_started():
+	"""Appelé quand une attaque démarre"""
+	if animation:
+		animation.set_state("attack")
+
+func _on_attack_finished():
+	"""Appelé quand une attaque se termine"""
+	pass
+
+func _on_enemy_hit(enemy: Node, damage_dealt: int):
+	"""Appelé quand un ennemi est touché"""
+	print("Ennemi attaque ", enemy.name, " pour ", damage_dealt, " dégâts")
+
+func _on_target_acquired(target: Node2D):
+	"""Appelé quand une nouvelle cible est acquise"""
+	print("Ennemi cible: ", target.name)
+
+func _on_target_lost():
+	"""Appelé quand la cible est perdue"""
+	print("Ennemi a perdu sa cible")
+
+# ========== API publique (pour compatibilité) ==========
 
 func take_damage(amount: int):
 	"""Inflige des dégâts à l'ennemi"""
-	current_health -= amount
-	print("Ennemi prend ", amount, " dégâts. Santé: ", current_health, "/", max_health)
-	
-	update_health_bar()
-	
-	if current_health <= 0:
-		die()
-
-func update_health_bar():
-	"""Met à jour l'affichage de la barre de vie"""
-	if health_bar_rect:
-		var health_percentage = float(current_health) / float(max_health)
-		health_bar_rect.size.x = health_bar_rect.get_parent().size.x * health_percentage
-		
-func die():
-	"""Détruit l'ennemi"""
-	print("Ennemi détruit!")
-	queue_free()
-	
-func update_direction(direction_vector: Vector2):
-	"""
-	Convertit un vecteur de direction en direction cardinale (4 directions)
-	"""
-	if abs(direction_vector.x) > abs(direction_vector.y):
-		# Mouvement principalement horizontal
-		current_direction = "east" if direction_vector.x > 0 else "west"
-	else:
-		# Mouvement principalement vertical
-		current_direction = "south" if direction_vector.y > 0 else "north"
-
-func play_animation():
-	"""Joue l'animation appropriée selon l'état et la direction"""
-	if not animated_sprite or not animated_sprite.sprite_frames:
-		return
-	
-	var animation_name = current_state + "_" + current_direction
-	
-	# Vérifier si l'animation existe avant de la jouer
-	if animated_sprite.sprite_frames.has_animation(animation_name):
-		# Ne changer l'animation que si elle est différente
-		if animated_sprite.animation != animation_name:
-			animated_sprite.play(animation_name)
-	else:
-		# Fallback vers idle si l'animation n'existe pas
-		var fallback_name = "idle_" + current_direction
-		if animated_sprite.sprite_frames.has_animation(fallback_name):
-			if animated_sprite.animation != fallback_name:
-				animated_sprite.play(fallback_name)
+	if health:
+		health.take_damage(amount)
+		print("Ennemi prend ", amount, " dégâts. Santé: ", health.current_health, "/", health.max_health)

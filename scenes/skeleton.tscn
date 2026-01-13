@@ -1,8 +1,13 @@
-[gd_scene load_steps=74 format=3 uid="uid://cv1skec8bde23"]
+[gd_scene load_steps=78 format=3 uid="uid://cv1skec8bde23"]
 
 [ext_resource type="Texture2D" uid="uid://cchjl1n6sm53c" path="res://assets/characters/skeleton/skeleton-spritesheet.png" id="1_pbvs3"]
 [ext_resource type="Texture2D" uid="uid://bsgdnkb2p6qtk" path="res://assets/characters/skeleton/character-spritesheet.png" id="1_txkty"]
 [ext_resource type="Script" uid="uid://c70ph8ein2aqp" path="res://scenes/skeleton.gd" id="3_ivqcw"]
+[ext_resource type="Script" path="res://components/health_component.gd" id="4_health"]
+[ext_resource type="Script" path="res://components/necro_energy_component.gd" id="5_necro"]
+[ext_resource type="Script" path="res://components/combat_component.gd" id="6_combat"]
+[ext_resource type="Script" path="res://components/formation_follower.gd" id="7_formation"]
+[ext_resource type="Script" path="res://components/entity_state_manager.gd" id="8_state_manager"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_5pgwy"]
 atlas = ExtResource("1_txkty")
@@ -564,6 +569,32 @@ frame_progress = 0.28464663
 texture_filter = 1
 position = Vector2(-1, 9)
 shape = SubResource("CapsuleShape2D_txkty")
+
+[node name="HealthComponent" type="Node" parent="."]
+script = ExtResource("4_health")
+max_health = 40
+
+[node name="NecroEnergyComponent" type="Node" parent="."]
+script = ExtResource("5_necro")
+max_energy = 30.0
+drain_rate = 1.0
+
+[node name="CombatComponent" type="Node" parent="."]
+script = ExtResource("6_combat")
+damage = 15
+attack_range = 15.0
+attack_cooldown = 1.2
+attack_duration = 0.6
+detection_range = 300.0
+
+[node name="FormationFollower" type="Node" parent="."]
+script = ExtResource("7_formation")
+follow_distance = 30.0
+distance_tolerance = 10.0
+
+[node name="EntityStateManager" type="Node" parent="."]
+script = ExtResource("8_state_manager")
+initial_state = 0
 
 [node name="HealthBar" type="Control" parent="."]
 z_index = 100
