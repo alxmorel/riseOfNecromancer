@@ -1,31 +1,61 @@
-[gd_scene load_steps=2 format=3 uid="uid://cryv6bttrklb3"]
+[gd_scene load_steps=6 format=3 uid="uid://cryv6bttrklb3"]
 
-[ext_resource type="Script" path="res://scenes/inventory_ui.gd" id="1_tahbm"]
+[ext_resource type="Script" uid="uid://dxpa3stj00wuw" path="res://scenes/inventory_ui.gd" id="1_tahbm"]
+[ext_resource type="Texture2D" uid="uid://b5uy2dlsctdi" path="res://assets/grimoire_inventory1.png" id="2_ylkvr"]
+[ext_resource type="FontFile" uid="uid://3twsj3mxppsr" path="res://assets/High Spirited.ttf" id="3_mdwe3"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_iradw"]
+font = ExtResource("3_mdwe3")
+font_size = 37
+font_color = Color(0.1148968, 0.11489681, 0.11489678, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mdwe3"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.101960786, 0.101960786, 0.101960786, 0)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
 
 [node name="InventoryUI" type="CanvasLayer"]
 process_mode = 3
 script = ExtResource("1_tahbm")
 
 [node name="Panel" type="Panel" parent="."]
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -400.0
-offset_top = -300.0
-offset_right = 400.0
-offset_bottom = 300.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+[node name="TextureRect" type="TextureRect" parent="Panel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+texture = ExtResource("2_ylkvr")
+expand_mode = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.24800001
+anchor_top = 0.128
+anchor_right = 0.48200002
+anchor_bottom = 0.85
+offset_left = 0.3039856
+offset_top = 0.055999756
+offset_right = -0.2640381
+offset_bottom = 0.2000122
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 15
 
 [node name="Header" type="HBoxContainer" parent="Panel/VBoxContainer"]
 layout_mode = 2
@@ -33,33 +63,10 @@ layout_mode = 2
 [node name="CategoryLabel" type="Label" parent="Panel/VBoxContainer/Header"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Inventaire - Potions"
+text = "Potions"
+label_settings = SubResource("LabelSettings_iradw")
 horizontal_alignment = 1
 vertical_alignment = 1
-
-[node name="CloseButton" type="Button" parent="Panel/VBoxContainer/Header"]
-layout_mode = 2
-text = "X"
-
-[node name="Categories" type="HBoxContainer" parent="Panel/VBoxContainer"]
-layout_mode = 2
-alignment = 1
-
-[node name="PotionsButton" type="Button" parent="Panel/VBoxContainer/Categories"]
-layout_mode = 2
-text = "Potions"
-
-[node name="ObjectsButton" type="Button" parent="Panel/VBoxContainer/Categories"]
-layout_mode = 2
-text = "Objets"
-
-[node name="GrimoireButton" type="Button" parent="Panel/VBoxContainer/Categories"]
-layout_mode = 2
-text = "Grimoire"
-
-[node name="RareObjectsButton" type="Button" parent="Panel/VBoxContainer/Categories"]
-layout_mode = 2
-text = "Objets Rares"
 
 [node name="ScrollContainer" type="ScrollContainer" parent="Panel/VBoxContainer"]
 layout_mode = 2
@@ -70,3 +77,48 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 columns = 5
+
+[node name="Categories" type="VBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.776
+anchor_top = 0.12200001
+anchor_right = 0.776
+anchor_bottom = 0.87600005
+offset_left = 0.047973633
+offset_top = 62.943993
+offset_right = 106.04797
+offset_bottom = -278.648
+theme_override_constants/separation = 9
+alignment = 1
+
+[node name="PotionsButton" type="Button" parent="Panel/Categories"]
+layout_mode = 2
+text = "Potions"
+
+[node name="ObjectsButton" type="Button" parent="Panel/Categories"]
+layout_mode = 2
+text = "Objets"
+
+[node name="GrimoireButton" type="Button" parent="Panel/Categories"]
+layout_mode = 2
+text = "Sortilèges"
+
+[node name="RareObjectsButton" type="Button" parent="Panel/Categories"]
+layout_mode = 2
+text = "Objets Rares"
+
+[node name="CloseButton" type="Button" parent="Panel"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.758
+anchor_top = 0.128
+anchor_right = 0.758
+anchor_bottom = 0.128
+offset_left = -42.216003
+offset_top = -4.9440002
+offset_right = -1.2160034
+offset_bottom = 33.056
+theme_override_colors/font_color = Color(0.12955824, 0.1295586, 0.12955832, 1)
+theme_override_styles/normal = SubResource("StyleBoxFlat_mdwe3")
+text = "X"

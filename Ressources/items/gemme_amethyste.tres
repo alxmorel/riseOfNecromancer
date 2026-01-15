@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="Item" load_steps=2 format=3 uid="uid://example_rare_gem"]
+
+[ext_resource type="Script" path="res://Ressources/item.gd" id="1_1"]
+
+[resource]
+script = ExtResource("1_1")
+id = "rare_gem"
+name = "Gemme d'Améthyste"
+description = "Une gemme précieuse qui brille d'une lueur violette"
+item_type = 3
+stackable = true
+max_stack = 99
+value = 500

@@ -1,0 +1,20 @@
+[gd_scene load_steps=3 format=3 uid="uid://bvn5q8r7mxp1h"]
+
+[ext_resource type="Script" uid="uid://dkh7w8qaqxvfj" path="res://utils/portal.gd" id="1_portal"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_portal"]
+size = Vector2(64, 2)
+
+[node name="Portal" type="Area2D"]
+collision_mask = 7
+script = ExtResource("1_portal")
+portal_name = "portal_1"
+auto_transition = true
+interaction_key = "interact"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_portal")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+modulate = Color(0, 1, 1, 0.3)
+scale = Vector2(64, 64)

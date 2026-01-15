@@ -6,7 +6,7 @@ class_name Item
 enum ItemType {
 	POTION,
 	OBJECT,
-	GRIMOIRE,
+	SORTILEGE,
 	RARE_OBJECT
 }
 
@@ -26,8 +26,8 @@ func get_category_name() -> String:
 			return "Potions"
 		ItemType.OBJECT:
 			return "Objets"
-		ItemType.GRIMOIRE:
-			return "Grimoire"
+		ItemType.SORTILEGE:
+			return "Sortilège"
 		ItemType.RARE_OBJECT:
 			return "Objets Rares"
 	return "Inconnu"

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="Item" load_steps=2 format=3 uid="uid://example_rusty_key"]
+
+[ext_resource type="Script" path="res://Ressources/item.gd" id="1_1"]
+
+[resource]
+script = ExtResource("1_1")
+id = "rusty_key"
+name = "Clé Rouillée"
+description = "Une vieille clé qui pourrait ouvrir quelque chose..."
+item_type = 1
+stackable = false
+max_stack = 1
+value = 10

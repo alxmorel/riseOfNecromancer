@@ -7,9 +7,9 @@ signal closed()
 
 @onready var panel: Panel = $Panel
 @onready var category_label: Label = $Panel/VBoxContainer/Header/CategoryLabel
-@onready var close_button: Button = $Panel/VBoxContainer/Header/CloseButton
-@onready var category_buttons: HBoxContainer = $Panel/VBoxContainer/Categories
+@onready var close_button: Button  = $Panel/CloseButton
 @onready var items_grid: GridContainer = $Panel/VBoxContainer/ScrollContainer/ItemsGrid
+@onready var category_buttons: VBoxContainer = $Panel/Categories
 
 var inventory: InventoryComponent
 var current_category: Item.ItemType = Item.ItemType.POTION
@@ -69,7 +69,7 @@ func _refresh_display():
 	# Mettre à jour le label de catégorie
 	if category_label:
 		var category_name = _get_category_name(current_category)
-		category_label.text = "Inventaire - " + category_name
+		category_label.text = category_name
 	
 	# Afficher les items de la catégorie
 	var items_in_category = inventory.get_items_by_category(current_category)
@@ -119,8 +119,8 @@ func _get_category_name(category: Item.ItemType) -> String:
 			return "Potions"
 		Item.ItemType.OBJECT:
 			return "Objets"
-		Item.ItemType.GRIMOIRE:
-			return "Grimoire"
+		Item.ItemType.SORTILEGE:
+			return "Sortilèges"
 		Item.ItemType.RARE_OBJECT:
 			return "Objets Rares"
 	return "Inconnu"

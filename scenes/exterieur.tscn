@@ -1,4 +1,4 @@
-[gd_scene load_steps=40 format=4 uid="uid://dv2tg8vtkxq6o"]
+[gd_scene load_steps=42 format=4 uid="uid://dv2tg8vtkxq6o"]
 
 [ext_resource type="Texture2D" uid="uid://cg6u2cuywlfb6" path="res://tilesets/TX Tileset Grass.png" id="1_m1t6g"]
 [ext_resource type="Texture2D" uid="uid://oygwa0isagbs" path="res://tilesets/TX Props.png" id="2_erork"]
@@ -13,8 +13,10 @@
 [ext_resource type="Texture2D" uid="uid://1k42rieiv10k" path="res://tilesets/brasiers.png" id="9_sqoi8"]
 [ext_resource type="Texture2D" uid="uid://de3nh8xswisrk" path="res://tilesets/fenetre.png" id="10_2ekxh"]
 [ext_resource type="PackedScene" uid="uid://caroa123hbr5m" path="res://scenes/player.tscn" id="13_ms70r"]
-[ext_resource type="PackedScene" uid="uid://ccfhmbn6gh3gl" path="res://scenes/enemy.tscn" id="14_2nvis"]
 [ext_resource type="PackedScene" uid="uid://cv1skec8bde23" path="res://scenes/skeleton.tscn" id="14_dnfk8"]
+[ext_resource type="PackedScene" uid="uid://bvn5q8r7mxp1h" path="res://scenes/portal_template.tscn" id="16_eb68q"]
+[ext_resource type="PackedScene" uid="uid://cnp8yh3xqw5k1" path="res://scenes/item_pickup.tscn" id="16_tfcj5"]
+[ext_resource type="Resource" uid="uid://bw316jyy050ld" path="res://Ressources/items/potion_vie.tres" id="17_brcjc"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_axuiv"]
 texture = ExtResource("1_m1t6g")
@@ -1364,23 +1366,21 @@ tile_map_data = PackedByteArray("AABGACcAAAANAAsAAAABACcAAAANAAsAAAA8AAUAAAAVAAs
 tile_set = SubResource("TileSet_eb68q")
 
 [node name="Player" parent="." instance=ExtResource("13_ms70r")]
-position = Vector2(281, 400)
+position = Vector2(592, 119)
 
 [node name="Skeleton" parent="." instance=ExtResource("14_dnfk8")]
 position = Vector2(316, 389)
 
-[node name="Enemy" parent="." instance=ExtResource("14_2nvis")]
-position = Vector2(460, 387)
-scale = Vector2(0.3, 0.3)
+[node name="Portal" parent="." instance=ExtResource("16_eb68q")]
+z_index = 1
+position = Vector2(593, 81)
+collision_mask = 3
+target_scene = "uid://4njck0xlkc0i"
 
-[node name="Enemy2" parent="." instance=ExtResource("14_2nvis")]
-position = Vector2(528, 394)
-scale = Vector2(0.3, 0.3)
-
-[node name="Enemy3" parent="." instance=ExtResource("14_2nvis")]
-position = Vector2(495, 350)
-scale = Vector2(0.3, 0.3)
-
-[node name="Enemy4" parent="." instance=ExtResource("14_2nvis")]
-position = Vector2(459, 343)
-scale = Vector2(0.3, 0.3)
+[node name="ItemPickup" parent="." instance=ExtResource("16_tfcj5")]
+position = Vector2(18, 116)
+item_resource = ExtResource("17_brcjc")
+show_name = false
+bob_animation = false
+sprite_scale = 0.2
+interaction_text = "[E]"

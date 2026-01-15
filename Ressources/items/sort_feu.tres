@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="Item" load_steps=2 format=3 uid="uid://example_fire_spell"]
+
+[ext_resource type="Script" path="res://Ressources/item.gd" id="1_1"]
+
+[resource]
+script = ExtResource("1_1")
+id = "fire_spell"
+name = "Sort de Feu"
+description = "Lance une boule de feu dévastatrice"
+item_type = 2
+stackable = false
+max_stack = 1
+value = 100

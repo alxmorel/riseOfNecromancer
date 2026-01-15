@@ -14,8 +14,8 @@ extends CharacterBody2D
 @onready var inventory_ui: InventoryUI = $InventoryUI if has_node("InventoryUI") else null
 
 # UI
-@onready var health_bar_rect: ColorRect = $HealthBar/HealthBarRect
-@onready var necro_bar_rect: ColorRect = $NecroBar/NecroBarRect
+@onready var health_bar_rect: ColorRect = $CanvasLayer/HealthBar/HealthBarRect
+@onready var necro_bar_rect: ColorRect = $CanvasLayer/NecroBar/NecroBarRect
 
 # Configuration export
 @export var speed: float = 200.0
@@ -31,6 +31,10 @@ var current_state: State = State.IDLE
 func _ready():
 	add_to_group("players")
 	
+	# Restaurer l'état du joueur
+	await get_tree().process_frame  # Attendre que tous les composants soient prêts
+	Global.restore_player_state(self)
+	
 	# Vérifier que les composants sont présents
 	_check_components()
 	
@@ -40,9 +44,6 @@ func _ready():
 	# Configurer l'inventaire UI
 	if inventory and inventory_ui:
 		inventory_ui.setup(inventory)
-		
-		# TEST : Ajouter quelques items de test
-		_add_test_items()
 	
 	# Lancer l'animation idle par défaut
 	if animation:
@@ -327,61 +328,6 @@ func _toggle_inventory():
 		inventory_ui.close_inventory()
 	else:
 		inventory_ui.open_inventory()
-
-func _add_test_items():
-	"""Ajoute quelques items de test à l'inventaire"""
-	if not inventory:
-		return
-	
-	# Potion de vie
-	var health_potion = Item.new()
-	health_potion.id = "health_potion"
-	health_potion.name = "Potion de Vie"
-	health_potion.description = "Restaure 50 HP"
-	health_potion.item_type = Item.ItemType.POTION
-	health_potion.stackable = true
-	health_potion.max_stack = 10
-	inventory.add_item(health_potion, 3)
-	
-	# Potion de mana
-	var mana_potion = Item.new()
-	mana_potion.id = "mana_potion"
-	mana_potion.name = "Potion de Mana"
-	mana_potion.description = "Restaure 30 énergie nécromantique"
-	mana_potion.item_type = Item.ItemType.POTION
-	mana_potion.stackable = true
-	mana_potion.max_stack = 10
-	inventory.add_item(mana_potion, 5)
-	
-	# Sort de feu
-	var fire_spell = Item.new()
-	fire_spell.id = "fire_spell"
-	fire_spell.name = "Sort de Feu"
-	fire_spell.description = "Lance une boule de feu dévastatrice"
-	fire_spell.item_type = Item.ItemType.GRIMOIRE
-	fire_spell.stackable = false
-	inventory.add_item(fire_spell, 1)
-	
-	# Clé rouillée
-	var rusty_key = Item.new()
-	rusty_key.id = "rusty_key"
-	rusty_key.name = "Clé Rouillée"
-	rusty_key.description = "Une vieille clé qui pourrait ouvrir quelque chose..."
-	rusty_key.item_type = Item.ItemType.OBJECT
-	rusty_key.stackable = false
-	inventory.add_item(rusty_key, 1)
-	
-	# Gemme rare
-	var rare_gem = Item.new()
-	rare_gem.id = "rare_gem"
-	rare_gem.name = "Gemme d'Améthyste"
-	rare_gem.description = "Une gemme précieuse qui brille d'une lueur violette"
-	rare_gem.item_type = Item.ItemType.RARE_OBJECT
-	rare_gem.stackable = true
-	rare_gem.max_stack = 99
-	inventory.add_item(rare_gem, 2)
-	
-	print("🎒 Items de test ajoutés à l'inventaire")
 
 # ========== API publique (pour compatibilité) ==========
 

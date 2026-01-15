@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="Item" load_steps=3 format=3 uid="uid://bw316jyy050ld"]
+
+[ext_resource type="Script" uid="uid://bg1jfnrh8nngb" path="res://Ressources/item.gd" id="1_1"]
+[ext_resource type="Texture2D" uid="uid://b6n60syu1eh04" path="res://assets/items/atlas_texture/potion_rouge_texture.tres" id="1_hktqi"]
+
+[resource]
+script = ExtResource("1_1")
+id = "health_potion"
+name = "Potion de Vie"
+description = "Restaure 50 HP"
+icon = ExtResource("1_hktqi")
+item_type = 0
+max_stack = 10
+value = 50
